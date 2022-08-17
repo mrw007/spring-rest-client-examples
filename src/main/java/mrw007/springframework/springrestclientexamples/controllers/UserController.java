@@ -2,9 +2,9 @@ package mrw007.springframework.springrestclientexamples.controllers;
 
 import lombok.extern.slf4j.Slf4j;
 import mrw007.springframework.springrestclientexamples.services.ApiService;
+import org.apache.commons.lang3.math.NumberUtils;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.server.ServerWebExchange;
@@ -15,7 +15,7 @@ import java.util.Optional;
 @Controller
 public class UserController {
 
-    private ApiService apiService;
+    private final ApiService apiService;
 
     public UserController(ApiService apiService) {
         this.apiService = apiService;
@@ -28,24 +28,17 @@ public class UserController {
 
     @PostMapping("/users")
     public String formPost(Model model, ServerWebExchange serverWebExchange) {
-        Optional<MultiValueMap<String, String>> map = Optional.ofNullable(serverWebExchange.getFormData().block());
-
-        if (map.isPresent()) {
-            int limit = 0;
-            String getLimit = map.get().get("limit").get(0);
-            if (getLimit != null) {
-                limit = Integer.parseInt(getLimit);
-            }
-            log.debug("Received Limit value: " + limit);
-            //default if null or zero
-            if (limit == 0) {
-                log.debug("Setting limit to default of 10");
-                limit = 10;
-            }
-            model.addAttribute("users", apiService.getUsers(limit));
-        } else {
-            throw new RuntimeException("Mapping Problem");
-        }
+        model.addAttribute("users", apiService.getUsers(serverWebExchange.getFormData()
+                .map(data -> {
+                    Optional<String> limit = Optional.ofNullable(data.getFirst("limit"));
+                    if (limit.isEmpty()
+                            || limit.get().equals("")
+                            || !NumberUtils.isParsable(limit.get())
+                            || Integer.parseInt(limit.get()) == 0) {
+                        return 10;
+                    }
+                    return Integer.parseInt(limit.get());
+                })));
         return "userlist";
     }
 }
